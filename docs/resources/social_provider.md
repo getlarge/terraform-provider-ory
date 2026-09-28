@@ -175,6 +175,22 @@ resource "ory_social_provider" "google_sync_on_login" {
   update_identity_on_login = "automatic"
 }
 
+# Generic OIDC provider with OpenID Connect Front-Channel Logout
+resource "ory_social_provider" "corporate_front_channel_logout" {
+  provider_id   = "corporate-fcl"
+  provider_type = "generic"
+  client_id     = var.sso_client_id
+  client_secret = var.sso_client_secret
+  issuer_url    = "https://sso.example.com"
+  scope         = ["openid", "email", "profile"]
+
+  # Lets the identity provider end the Ory session from its own sign-out page.
+  # The provider must implement OpenID Connect Front-Channel Logout and return
+  # the sid claim in its ID tokens (Ory Hydra, Keycloak, Okta, Auth0). Google
+  # does not issue sid, so the flag has no effect on a google provider.
+  front_channel_logout = true
+}
+
 # Generic OIDC with a custom base redirect URI (e.g., when using a custom domain)
 resource "ory_social_provider" "corporate_sso_custom_domain" {
   provider_id       = "corporate-sso-custom-domain"
@@ -565,6 +581,27 @@ resource "ory_social_provider" "google" {
 
 Leave the attribute unset to use the Ory default (`never`). The API accepts only the values `never` and `automatic`.
 
+## Front-Channel Logout
+
+Set `front_channel_logout = true` to enable OpenID Connect Front-Channel Logout for a provider. A login then issues a companion cookie that lets the provider end the resulting Ory session from its own sign-out page.
+
+The identity provider must implement [OpenID Connect Front-Channel Logout](https://openid.net/specs/openid-connect-frontchannel-1_0.html) and return the `sid` claim in its ID tokens. Enterprise and self-hosted providers such as Ory Hydra, Keycloak, Okta, and Auth0 do. Google does not issue a `sid` claim, so the flag has no effect on a `google` provider.
+
+```hcl
+resource "ory_social_provider" "corporate_sso" {
+  provider_id   = "corporate"
+  provider_type = "generic"
+  client_id     = var.sso_client_id
+  client_secret = var.sso_client_secret
+  issuer_url    = "https://sso.example.com"
+  scope         = ["openid", "email", "profile"]
+
+  front_channel_logout = true
+}
+```
+
+The API stores `true` and `false` alike and returns the value on read. Leave the attribute unset to keep the Ory default, which is disabled; removing it from the configuration clears the setting.
+
 ## Base Redirect URI
 
 The `base_redirect_uri` attribute overrides the base URL Ory uses when constructing OIDC callback URLs. Use this when your project is accessible under a custom domain and you want callbacks to go to that domain rather than the default Ory project URL.
@@ -633,6 +670,7 @@ The `provider_id` is the unique identifier you chose when creating the provider.
 - `client_secret_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only equivalent of client_secret (Terraform 1.11+ write-only argument): the value is sent to Ory but never stored in Terraform state or plan. Use this to source the client secret from an ephemeral resource such as a Vault secret. Because write-only values are not persisted, Terraform cannot detect when the value changes on its own — change client_secret_wo_version to rotate it. Mutually exclusive with client_secret.
 - `client_secret_wo_version` (String) Version trigger for client_secret_wo. Change this value whenever the write-only client_secret_wo changes so Terraform sends the new secret to Ory (write-only values are not stored in state and cannot be diffed). Has no effect unless client_secret_wo is set.
 - `fedcm_config_url` (String) URL of the provider's FedCM (Federated Credential Management) configuration file. When set, Ory can use the browser's FedCM API for sign-in with this provider instead of a full-page redirect. For example, Google's FedCM configuration is served at "https://accounts.google.com/gsi/fedcm.json". Leave unset to disable FedCM for this provider.
+- `front_channel_logout` (Boolean) Enable OpenID Connect Front-Channel Logout for this provider. When true, a login issues a companion cookie that lets the provider end the resulting Ory session from its own sign-out page. Requires the provider to return the sid claim in the ID token. Leave unset to keep the Ory default (disabled).
 - `issuer_url` (String) OIDC issuer URL (required for generic providers).
 - `label` (String) Human-readable label for the provider, displayed on the login button (e.g., "Sign in with Corporate SSO").
 - `mapper_url` (String) Jsonnet mapper URL for claims mapping. Can be a URL or base64-encoded Jsonnet (base64://...). If not set, a default mapper that extracts email from claims will be used.
