@@ -37,6 +37,12 @@ resource "ory_project_config" "basic" {
   session_lifespan                                        = "720h0m0s" # 30 days
 }
 
+# Ory Permission Language namespaces. This replaces keto_namespaces: configure
+# one representation or the other for a project.
+resource "ory_project_config" "with_opl" {
+  keto_namespace_configuration = "base64://${base64encode(file("${path.module}/namespaces.ts"))}"
+}
+
 # Project configuration with a write-only (ephemeral) SMTP connection URI from Vault.
 # smtp_connection_uri_wo is never stored in Terraform state or plan (Terraform 1.11+).
 # Bump smtp_connection_uri_wo_version whenever the secret rotates so Terraform re-sends it.
@@ -387,6 +393,10 @@ resource "ory_project_config" "sign_in_after_registration" {
 }
 ```
 
+## OPL Namespace Configuration
+
+Set `keto_namespace_configuration` to a `base64://` value containing an Ory Permission Language file, or set `keto_namespaces` to an inline namespace list. These attributes replace the same API member and cannot be configured together. The API stores inline OPL at a hash-named storage URL; the provider compares its content hash with the configured payload so an unchanged file produces an empty plan. After import, the first plan may show a one-time in-place update to apply the configured OPL value.
+
 ## Courier HTTP Request Body
 
 Set `courier_http_request_config_body` to a `base64://` value that carries the Jsonnet template inline. The Ory API rejects a plain Jsonnet string, and it rejects a URL outside its own storage:
@@ -693,7 +703,7 @@ terraform plan  # verify no changes
 - `identity_secrets_default` (List of String, Sensitive) Default signing secrets for the identity service.
 - `identity_secrets_pagination` (List of String, Sensitive) Pagination encryption keys for the identity service.
 - `keto_feature_flags_strict_mode` (Boolean) Enable Ory Keto strict mode. In strict mode, relation tuples for permits are not checked directly (only the OPL rewrites apply) and subject sets are only expanded when declared with SubjectSet<...>, which makes permission checks faster. New projects are created with strict mode enabled and locked; on a locked project the API accepts a write but keeps the stored value, so only projects created before the lock can change it. The provider fails the apply with an error instead of sending a value that the lock would discard.
-- `keto_namespace_configuration` (String) URL pointing to an OPL file with the Keto namespace configuration.
+- `keto_namespace_configuration` (String) URL pointing to an OPL file with the Keto namespace configuration. Ory accepts either an OPL location or an inline namespace list, so this conflicts with keto_namespaces.
 - `keto_namespaces` (List of String) List of Keto namespace names to configure for Ory Permissions. Namespaces define the types of resources in your permission model (e.g., 'documents', 'folders'). Each namespace name must be unique.
 - `keto_secrets_pagination` (List of String, Sensitive) Pagination encryption keys for the permission service.
 - `login_style` (String, Deprecated) Login flow style: 'unified' (default) shows all auth methods on one screen, 'identifier_first' collects the identifier before showing auth methods.
