@@ -435,6 +435,30 @@ Import using the project ID:
 terraform import ory_project_config.main <project-id>
 ```
 
+### Import selected scalar settings without an apply
+
+A project-ID-only import leaves configuration fields unset. To read existing values into state during import, append a comma-separated list of attributes:
+
+```shell
+terraform import ory_project_config.main '<project-id>:session_lifespan,cors_enabled'
+```
+
+Declare the selected attributes with their current live values:
+
+```hcl
+resource "ory_project_config" "main" {
+  project_id       = "<project-id>"
+  session_lifespan = "20m0s"
+  cors_enabled     = false
+}
+```
+
+Only the listed fields enter state. Import uses reads only. An unset or unreadable selected value fails the whole import.
+
+Select readable, non-sensitive strings, booleans, or integers. Collections, nested objects, secrets, fields derived from hook lists, and the courier HTTP request body are not supported by this import form. The courier body reader returns a storage URL without recovering the inline payload. For renamed fields, select either the current name or its deprecated alias, never both.
+
+Run a normal plan after import. It can still propose changes for configured fields omitted from the selection, provider defaults, or differences from the live values. Include defaulted fields such as `cors_enabled` explicitly when establishing a baseline. If you omit cors_enabled from both the selection and configuration, a later apply can disable public CORS through its default. Import does not improve the resource's existing drift coverage.
+
 ### Avoiding "Forces Replacement" After Import
 
 After importing, if Terraform shows `project_id forces replacement`, ensure your configuration matches:
